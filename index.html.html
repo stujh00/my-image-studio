@@ -1,0 +1,1194 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>짤·카드 스튜디오</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Pretendard:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#191f28;
+    --paper:#ffffff;
+    --panel:#f2f4f6;
+    --line:#e5e8eb;
+    --accent:#0064ff;
+    --accent-2:#e8f1ff;
+    --focus:#0064ff;
+    --ok:#00c285;
+    --err:#f04452;
+    --muted:#6b7684;
+    font-family: 'Pretendard', system-ui, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    min-height:100vh;
+  }
+  header{
+    padding:28px 24px 16px;
+    border-bottom:1px solid var(--line);
+  }
+  header h1{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:28px;
+    margin:0 0 4px;
+    letter-spacing:-0.02em;
+  }
+  header p{
+    margin:0;
+    color:var(--muted);
+    font-size:14px;
+  }
+  .layout{
+    display:grid;
+    grid-template-columns:minmax(280px,420px) 1fr;
+    gap:20px;
+    padding:20px;
+    max-width:1180px;
+    margin:0 auto;
+  }
+  @media (max-width:820px){
+    .layout{grid-template-columns:1fr;}
+  }
+  .stage{
+    background:var(--panel);
+    border:none;
+    box-shadow:0 2px 10px rgba(25,31,40,0.06);
+    border-radius:20px;
+    padding:18px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:14px;
+  }
+  .ratio-tabs{
+    display:flex;
+    gap:6px;
+    background:var(--paper);
+    border:1px solid var(--line);
+    padding:4px;
+    border-radius:999px;
+  }
+  .ratio-tabs button{
+    border:none;
+    background:transparent;
+    color:var(--muted);
+    padding:6px 16px;
+    border-radius:999px;
+    font-size:13px;
+    font-weight:600;
+    cursor:pointer;
+    font-family:'Space Grotesk', sans-serif;
+  }
+  .ratio-tabs button.active{
+    background:var(--accent);
+    color:#ffffff;
+  }
+  #stageCanvas{
+    max-width:100%;
+    max-height:520px;
+    background:
+      linear-gradient(45deg,#e5e8eb 25%,transparent 25%),
+      linear-gradient(-45deg,#e5e8eb 25%,transparent 25%),
+      linear-gradient(45deg,transparent 75%,#e5e8eb 75%),
+      linear-gradient(-45deg,transparent 75%,#e5e8eb 75%);
+    background-color:#ffffff;
+    background-size:20px 20px;
+    background-position:0 0,0 10px,10px -10px,-10px 0px;
+    border:1px solid var(--line);
+    border-radius:0px;
+    touch-action:none;
+    cursor:grab;
+  }
+  .hint{
+    font-size:12px;
+    color:var(--muted);
+    text-align:center;
+  }
+  .panel{
+    background:var(--panel);
+    border:none;
+    box-shadow:0 2px 10px rgba(25,31,40,0.06);
+    border-radius:20px;
+    padding:18px;
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+  }
+  .block h2{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:15px;
+    margin:0 0 10px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .block h2::before{
+    content:"";
+    width:8px;height:8px;
+    background:var(--accent);
+    display:inline-block;
+    border-radius:2px;
+  }
+  .current-tpl{
+    font-family:'Pretendard', sans-serif;
+    font-weight:400;
+    font-size:12px;
+    color:var(--accent);
+    margin-left:2px;
+  }
+  .dropzone{
+    border:2px dashed var(--line);
+    border-radius:16px;
+    padding:28px 16px;
+    text-align:center;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:12px;
+    transition:border-color .15s, background-color .15s;
+    background-color: #ffffff;
+  }
+  .dropzone.drag-over{border-color:var(--accent);background:var(--accent-2);}
+  .dropzone-text{
+    margin:0;
+    font-size:13px;
+    color:var(--muted);
+    line-height:1.5;
+  }
+  .dropzone-hint{
+    font-size:11px;
+    color:var(--muted);
+  }
+  .field{
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+    margin-bottom:10px;
+  }
+  .field label{
+    font-size:12px;
+    color:var(--muted);
+    display:flex;
+    justify-content:space-between;
+  }
+  textarea, input[type=text], input[type=range], input[type=color], select{
+    font-family:inherit;
+    font-size:14px;
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:8px;
+    background:var(--paper);
+    color:var(--ink);
+  }
+  textarea:focus, input[type=text]:focus, select:focus{
+    outline:2px solid var(--focus);
+    outline-offset:1px;
+  }
+  input[type=range]{
+    --fill:50%;
+    -webkit-appearance:none;
+    appearance:none;
+    width:100%;
+    height:6px;
+    border-radius:999px;
+    background:linear-gradient(to right, #7fb0ff 0%, var(--accent) var(--fill), var(--line) var(--fill), var(--line) 100%);
+    border:none;
+    padding:0;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    appearance:none;
+    width:20px;
+    height:20px;
+    border-radius:50%;
+    background:var(--accent);
+    box-shadow:0 1px 4px rgba(0,100,255,0.4);
+    cursor:pointer;
+    border:none;
+  }
+  input[type=range]::-moz-range-track{
+    height:6px;
+    border-radius:999px;
+    background:var(--line);
+  }
+  input[type=range]::-moz-range-progress{
+    height:6px;
+    border-radius:999px;
+    background:linear-gradient(to right, #7fb0ff, var(--accent));
+  }
+  input[type=range]::-moz-range-thumb{
+    width:20px;
+    height:20px;
+    border-radius:50%;
+    background:var(--accent);
+    box-shadow:0 1px 4px rgba(0,100,255,0.4);
+    cursor:pointer;
+    border:none;
+  }
+  textarea{resize:vertical;min-height:56px;}
+  input[type=range]{padding:0;}
+  .row{display:flex;gap:8px;}
+  .row > *{flex:1;}
+  .color-picker{position:relative;display:inline-block;}
+  .color-swatch{
+    width:36px;
+    height:36px;
+    border-radius:10px;
+    border:1px solid var(--line);
+    cursor:pointer;
+    padding:0;
+  }
+  .color-panel{
+    position:absolute;
+    top:44px;
+    left:0;
+    z-index:20;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:10px;
+    box-shadow:0 8px 24px rgba(25,31,40,0.14);
+    padding:14px;
+    width:200px;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+  .color-panel[hidden] { display: none !important; }
+  .color-panel .field{margin-bottom:0;}
+  .color-panel .row{gap:6px;}
+  .color-panel input[type=number]{width:100%;padding:6px;text-align:center;}
+  .color-panel input[type=text]{width:100%;text-transform:uppercase;}
+  #svCanvas{
+    width:100%;
+    height:140px;
+    border-radius:8px;
+    cursor:crosshair;
+    display:block;
+  }
+  input.hue-slider{
+    -webkit-appearance:none;
+    appearance:none;
+    width:100%;
+    height:10px;
+    border-radius:999px;
+    background:linear-gradient(to right, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000);
+    border:none;
+    padding:0;
+  }
+  input.hue-slider::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    appearance:none;
+    width:16px;
+    height:16px;
+    border-radius:50%;
+    background:#fff;
+    border:2px solid var(--line);
+    box-shadow:0 1px 4px rgba(0,0,0,0.3);
+    cursor:pointer;
+  }
+  input.hue-slider::-moz-range-thumb{
+    width:16px;
+    height:16px;
+    border-radius:50%;
+    background:#fff;
+    border:2px solid var(--line);
+    box-shadow:0 1px 4px rgba(0,0,0,0.3);
+    cursor:pointer;
+  }
+  input.hue-slider::-moz-range-track{
+    height:10px;
+    border-radius:999px;
+    background:transparent;
+  }
+  .btn{
+    font-family:'Space Grotesk', sans-serif;
+    font-weight:600;
+    font-size:13px;
+    border:1px solid var(--line);
+    background:var(--paper);
+    color:var(--ink);
+    padding:9px 14px;
+    border-radius:12px;
+    cursor:pointer;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .btn:hover{background:var(--accent-2);border-color:var(--accent-2);}
+  .btn.primary{
+    background:var(--accent);
+    color:#ffffff;
+    border-color:var(--accent);
+  }
+  .btn.primary:hover{background:#0052d6;border-color:#0052d6;}
+  .btn.small{padding:5px 10px;font-size:12px;}
+  .msg{
+    font-size:12px;
+    padding:8px 10px;
+    border-radius:8px;
+    display:none;
+  }
+  .msg.show{display:block;}
+  .msg.err{background:#feecee;color:var(--err);}
+  .msg.ok{background:#e5faf3;color:var(--ok);}
+  .tpl-list{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    max-height:220px;
+    overflow-y:auto;
+  }
+  .tpl-item{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    border:1px solid var(--line);
+    border-radius:5px;
+    padding:6px 8px;
+  }
+  .tpl-thumb{
+    width:36px;height:36px;
+    object-fit:cover;
+    border-radius:8px;
+    background:var(--line);
+    flex-shrink:0;
+    border:1px solid var(--line);
+  }
+  .tpl-name{
+    flex:1;
+    font-size:13px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .tpl-empty{
+    font-size:12px;
+    color:var(--muted);
+    padding:8px 0;
+  }
+  .json-row{display:flex;gap:8px;}
+  footer{
+    text-align:center;
+    font-size:12px;
+    color:var(--muted);
+    padding:24px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>짤·카드 스튜디오</h1>
+  <p>이미지와 문구를 조합해 밈·카드·SNS 이미지를 만들고 내려받으세요.</p>
+</header>
+
+<div class="layout">
+
+  <div class="stage">
+    <div class="ratio-tabs" id="ratioTabs">
+      <button data-ratio="1:1" class="active">1:1</button>
+      <button data-ratio="4:5">4:5</button>
+      <button data-ratio="9:16">9:16</button>
+    </div>
+    <canvas id="stageCanvas"></canvas>
+    <div class="hint">캔버스에서 문구를 드래그해 위치를 바꿀 수 있어요</div>
+    <button class="btn primary" id="downloadBtn" style="width:100%">이미지 내려받기 (PNG)</button>
+    <div class="msg" id="stageMsg"></div>
+  </div>
+
+  <div class="panel">
+
+    <div class="block">
+      <h2>이미지 불러오기</h2>
+      <div class="dropzone" id="dropzone">
+        <p class="dropzone-text">이미지를 드래그 앤 드롭하거나<br>찾아서 업로드하세요.</p>
+        <button type="button" class="btn primary" id="uploadBtn">사진 업로드</button>
+        <div class="dropzone-hint">PNG, JPEG 파일만 가능 · 다른 형식은 거부됩니다</div>
+        <input type="file" id="fileInput" accept="image/png,image/jpeg" style="display:none">
+      </div>
+    </div>
+
+    <div class="block">
+      <h2>문구</h2>
+      <div class="field">
+        <label>내용</label>
+        <textarea id="textInput" placeholder="여기에 문구를 입력하세요"></textarea>
+      </div>
+      <div class="field">
+        <label><span>글자 크기</span><span id="sizeVal">60</span></label>
+        <input type="range" id="sizeInput" min="20" max="160" value="60">
+      </div>
+      <div class="row">
+        <div class="field">
+          <label><span>가로 위치</span><span id="xVal">50</span>%</label>
+          <input type="range" id="xInput" min="0" max="100" value="50">
+        </div>
+        <div class="field">
+          <label><span>세로 위치</span><span id="yVal">85</span>%</label>
+          <input type="range" id="yInput" min="0" max="100" value="85">
+        </div>
+      </div>
+      <div class="field">
+        <label>색상</label>
+        <div class="color-picker">
+          <button type="button" class="color-swatch" id="colorSwatch"></button>
+          <div class="color-panel" id="colorPanel" hidden>
+            <canvas id="svCanvas" width="200" height="140"></canvas>
+            <input type="range" id="hueInput" class="hue-slider" min="0" max="360" value="0">
+            <div class="field">
+              <label>HEX</label>
+              <input type="text" id="hexInput" maxlength="7">
+            </div>
+            <div class="row">
+              <div class="field"><label>R</label><input type="number" id="rInput" min="0" max="255"></div>
+              <div class="field"><label>G</label><input type="number" id="gInput" min="0" max="255"></div>
+              <div class="field"><label>B</label><input type="number" id="bInput" min="0" max="255"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="block">
+      <h2>템플릿 <span class="current-tpl" id="currentTplLabel"></span></h2>
+      <div class="msg" id="tplActionMsg"></div>
+      <div class="row">
+        <input type="text" id="tplNameInput" placeholder="템플릿 이름">
+        <button class="btn small" id="saveTplBtn">현재 상태 저장</button>
+      </div>
+      <div class="tpl-list" id="tplList"><div class="tpl-empty">저장된 템플릿이 없습니다</div></div>
+    </div>
+
+    <div class="block">
+      <h2>백업 (JSON)</h2>
+      <div class="json-row">
+        <button class="btn small" id="exportJsonBtn">템플릿 내보내기</button>
+        <label class="btn small" style="cursor:pointer;">
+          템플릿 가져오기
+          <input type="file" id="importJsonInput" accept="application/json" style="display:none">
+        </label>
+      </div>
+      <div class="msg" id="tplMsg"></div>
+    </div>
+
+  </div>
+</div>
+
+<footer>메타데이터·위치정보는 저장하지 않으며, 모든 편집은 이 브라우저 세션의 저장소에만 보관됩니다.</footer>
+
+<script>
+// window.storage is only injected inside the Claude.ai artifact preview.
+// When this file is opened on its own (double-clicked, Live Server, GitHub
+// Pages, etc.) that object doesn't exist, so we fall back to localStorage
+// with the same get/set/delete/list interface.
+const storage = window.storage ? window.storage : {
+  async get(key, shared){
+    const raw = localStorage.getItem(key);
+    if(raw === null) throw new Error('not found');
+    return { key, value: raw, shared: !!shared };
+  },
+  async set(key, value, shared){
+    localStorage.setItem(key, value);
+    return { key, value, shared: !!shared };
+  },
+  async delete(key, shared){
+    localStorage.removeItem(key);
+    return { key, deleted:true, shared: !!shared };
+  },
+  async list(prefix, shared){
+    const keys = [];
+    for(let i=0;i<localStorage.length;i++){
+      const k = localStorage.key(i);
+      if(!prefix || k.startsWith(prefix)) keys.push(k);
+    }
+    return { keys, prefix, shared: !!shared };
+  },
+};
+
+const RATIOS = {
+  '1:1': {w:1080, h:1080},
+  '4:5': {w:1080, h:1350},
+  '9:16': {w:1080, h:1920},
+};
+
+const state = {
+  ratio: '1:1',
+  img: null,
+  imgDataURL: null,
+  text: '',
+  fontSize: 60,
+  x: 50,
+  y: 85,
+  color: '#000000',
+};
+
+const canvas = document.getElementById('stageCanvas');
+const ctx = canvas.getContext('2d');
+
+const els = {
+  ratioTabs: document.getElementById('ratioTabs'),
+  fileInput: document.getElementById('fileInput'),
+  dropzone: document.getElementById('dropzone'),
+  uploadBtn: document.getElementById('uploadBtn'),
+  textInput: document.getElementById('textInput'),
+  sizeInput: document.getElementById('sizeInput'),
+  sizeVal: document.getElementById('sizeVal'),
+  xInput: document.getElementById('xInput'),
+  xVal: document.getElementById('xVal'),
+  yInput: document.getElementById('yInput'),
+  yVal: document.getElementById('yVal'),
+  colorSwatch: document.getElementById('colorSwatch'),
+  colorPanel: document.getElementById('colorPanel'),
+  svCanvas: document.getElementById('svCanvas'),
+  hueInput: document.getElementById('hueInput'),
+  hexInput: document.getElementById('hexInput'),
+  rInput: document.getElementById('rInput'),
+  gInput: document.getElementById('gInput'),
+  bInput: document.getElementById('bInput'),
+  downloadBtn: document.getElementById('downloadBtn'),
+  stageMsg: document.getElementById('stageMsg'),
+  tplNameInput: document.getElementById('tplNameInput'),
+  saveTplBtn: document.getElementById('saveTplBtn'),
+  tplList: document.getElementById('tplList'),
+  currentTplLabel: document.getElementById('currentTplLabel'),
+  tplActionMsg: document.getElementById('tplActionMsg'),
+  exportJsonBtn: document.getElementById('exportJsonBtn'),
+  importJsonInput: document.getElementById('importJsonInput'),
+  tplMsg: document.getElementById('tplMsg'),
+};
+
+function showMsg(el, text, type){
+  el.textContent = text;
+  el.className = 'msg show ' + type;
+  clearTimeout(el._t);
+  el._t = setTimeout(()=>{ el.className='msg'; }, 4000);
+}
+
+// ---------- drawing ----------
+
+function wrapLines(context, text, maxWidth){
+  const paragraphs = text.split('\n');
+  const lines = [];
+  for(const para of paragraphs){
+    if(para === ''){ lines.push(''); continue; }
+    const words = para.split(' ');
+    let current = '';
+    for(const word of words){
+      const attempt = current ? current + ' ' + word : word;
+      if(context.measureText(attempt).width <= maxWidth || current === ''){
+        if(context.measureText(attempt).width <= maxWidth){
+          current = attempt;
+        } else {
+          if(current) lines.push(current);
+          current = breakLongToken(context, word, maxWidth, lines);
+        }
+      } else {
+        lines.push(current);
+        current = word;
+        if(context.measureText(current).width > maxWidth){
+          current = breakLongToken(context, current, maxWidth, lines);
+        }
+      }
+    }
+    if(current !== '') lines.push(current);
+  }
+  return lines;
+}
+
+function breakLongToken(context, token, maxWidth, lines){
+  const chars = Array.from(token);
+  let cur = '';
+  for(const ch of chars){
+    const attempt = cur + ch;
+    if(context.measureText(attempt).width <= maxWidth || cur === ''){
+      cur = attempt;
+    } else {
+      lines.push(cur);
+      cur = ch;
+    }
+  }
+  return cur;
+}
+
+function draw(){
+  const {w, h} = RATIOS[state.ratio];
+  canvas.width = w;
+  canvas.height = h;
+
+  ctx.clearRect(0,0,w,h);
+
+  if(state.img){
+    const ir = state.img.width / state.img.height;
+    const cr = w / h;
+    let sx, sy, sw, sh;
+    if(ir > cr){
+      sh = state.img.height;
+      sw = sh * cr;
+      sx = (state.img.width - sw) / 2;
+      sy = 0;
+    } else {
+      sw = state.img.width;
+      sh = sw / cr;
+      sx = 0;
+      sy = (state.img.height - sh) / 2;
+    }
+    ctx.drawImage(state.img, sx, sy, sw, sh, 0, 0, w, h);
+  } else {
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0,0,w,h);
+    ctx.fillStyle = '#a4acb8';
+    ctx.font = '40px Pretendard, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('이미지를 불러오세요', w/2, h/2);
+  }
+
+  if(state.text){
+    const fontPx = state.fontSize * (w/1080);
+    ctx.font = `700 ${fontPx}px 'Space Grotesk', Pretendard, sans-serif`;
+    ctx.fillStyle = state.color;
+    ctx.textAlign = 'center';
+
+    const maxWidth = w * 0.88;
+    const lines = wrapLines(ctx, state.text, maxWidth);
+    const lineHeight = fontPx * 1.2;
+    const totalHeight = lines.length * lineHeight;
+
+    const cx = w * (state.x/100);
+    let cy = h * (state.y/100) - totalHeight/2 + lineHeight*0.8;
+
+    for(const line of lines){
+      if(line !== ''){
+        ctx.fillText(line, cx, cy);
+      }
+      cy += lineHeight;
+    }
+  }
+}
+
+// ---------- controls ----------
+
+els.ratioTabs.addEventListener('click', (e)=>{
+  const btn = e.target.closest('button');
+  if(!btn) return;
+  [...els.ratioTabs.children].forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  state.ratio = btn.dataset.ratio;
+  draw();
+});
+
+function updateSliderFill(input){
+  const min = Number(input.min || 0);
+  const max = Number(input.max || 100);
+  const pct = ((Number(input.value) - min) / (max - min)) * 100;
+  input.style.setProperty('--fill', pct + '%');
+}
+
+function updateUIValues(){
+  els.sizeInput.value = state.fontSize;
+  els.sizeVal.textContent = state.fontSize;
+  updateSliderFill(els.sizeInput);
+
+  els.xInput.value = Math.round(state.x);
+  els.xVal.textContent = Math.round(state.x);
+  updateSliderFill(els.xInput);
+
+  els.yInput.value = Math.round(state.y);
+  els.yVal.textContent = Math.round(state.y);
+  updateSliderFill(els.yInput);
+}
+
+[els.sizeInput, els.xInput, els.yInput].forEach(updateSliderFill);
+
+els.textInput.addEventListener('input', ()=>{ state.text = els.textInput.value; draw(); });
+
+els.sizeInput.addEventListener('input', ()=>{
+  state.fontSize = Number(els.sizeInput.value);
+  els.sizeVal.textContent = state.fontSize;
+  updateSliderFill(els.sizeInput);
+  draw();
+});
+
+els.xInput.addEventListener('input', ()=>{
+  state.x = Number(els.xInput.value);
+  els.xVal.textContent = state.x;
+  updateSliderFill(els.xInput);
+  draw();
+});
+
+els.yInput.addEventListener('input', ()=>{
+  state.y = Number(els.yInput.value);
+  els.yVal.textContent = state.y;
+  updateSliderFill(els.yInput);
+  draw();
+});
+
+function hexToRgb(hex){
+  const m = hex.replace('#','');
+  const v = m.length === 3 ? m.split('').map(c=>c+c).join('') : m;
+  const num = parseInt(v, 16);
+  if(v.length !== 6 || isNaN(num)) return null;
+  return { r:(num>>16)&255, g:(num>>8)&255, b:num&255 };
+}
+function rgbToHex(r,g,b){
+  return '#' + [r,g,b].map(n=>Math.max(0,Math.min(255,Math.round(n))).toString(16).padStart(2,'0')).join('');
+}
+function rgbToHsv(r,g,b){
+  r/=255; g/=255; b/=255;
+  const max=Math.max(r,g,b), min=Math.min(r,g,b), d=max-min;
+  let h=0;
+  if(d !== 0){
+    switch(max){
+      case r: h=((g-b)/d)%6; break;
+      case g: h=(b-r)/d+2; break;
+      case b: h=(r-g)/d+4; break;
+    }
+    h *= 60;
+    if(h<0) h+=360;
+  }
+  const s = max===0 ? 0 : d/max;
+  const v = max;
+  return { h, s:s*100, v:v*100 };
+}
+function hsvToRgb(h,s,v){
+  s/=100; v/=100;
+  const c = v*s;
+  const x = c*(1-Math.abs((h/60)%2-1));
+  const m = v-c;
+  let r=0,g=0,b=0;
+  if(h<60){ r=c; g=x; } else if(h<120){ r=x; g=c; } else if(h<180){ g=c; b=x; }
+  else if(h<240){ g=x; b=c; } else if(h<300){ r=x; b=c; } else { r=c; b=x; }
+  return { r:Math.round((r+m)*255), g:Math.round((g+m)*255), b:Math.round((b+m)*255) };
+}
+
+const hsv = { h:0, s:0, v:100 };
+const svCtx = els.svCanvas.getContext('2d');
+
+function drawSvSquare(){
+  const w = els.svCanvas.width, h = els.svCanvas.height;
+  const hueRgb = hsvToRgb(hsv.h, 100, 100);
+  svCtx.fillStyle = `rgb(${hueRgb.r},${hueRgb.g},${hueRgb.b})`;
+  svCtx.fillRect(0,0,w,h);
+
+  const whiteGrad = svCtx.createLinearGradient(0,0,w,0);
+  whiteGrad.addColorStop(0,'rgba(255,255,255,1)');
+  whiteGrad.addColorStop(1,'rgba(255,255,255,0)');
+  svCtx.fillStyle = whiteGrad;
+  svCtx.fillRect(0,0,w,h);
+
+  const blackGrad = svCtx.createLinearGradient(0,0,0,h);
+  blackGrad.addColorStop(0,'rgba(0,0,0,0)');
+  blackGrad.addColorStop(1,'rgba(0,0,0,1)');
+  svCtx.fillStyle = blackGrad;
+  svCtx.fillRect(0,0,w,h);
+
+  const px = (hsv.s/100) * w;
+  const py = (1 - hsv.v/100) * h;
+  svCtx.beginPath();
+  svCtx.arc(px, py, 7, 0, Math.PI*2);
+  svCtx.strokeStyle = '#ffffff';
+  svCtx.lineWidth = 2;
+  svCtx.stroke();
+  svCtx.beginPath();
+  svCtx.arc(px, py, 7, 0, Math.PI*2);
+  svCtx.strokeStyle = 'rgba(0,0,0,0.35)';
+  svCtx.lineWidth = 1;
+  svCtx.stroke();
+}
+
+function setColorFromHex(hex, source){
+  const rgb = hexToRgb(hex);
+  if(!rgb) return;
+  state.color = rgbToHex(rgb.r, rgb.g, rgb.b);
+  els.colorSwatch.style.background = state.color;
+  if(source !== 'hex') els.hexInput.value = state.color;
+  if(source !== 'rgb'){ els.rInput.value = rgb.r; els.gInput.value = rgb.g; els.bInput.value = rgb.b; }
+  if(source !== 'sv' && source !== 'hue'){
+    const newHsv = rgbToHsv(rgb.r, rgb.g, rgb.b);
+    hsv.h = newHsv.h; hsv.s = newHsv.s; hsv.v = newHsv.v;
+    els.hueInput.value = hsv.h;
+  }
+  drawSvSquare();
+  draw();
+}
+
+function setColorFromHsv(){
+  const rgb = hsvToRgb(hsv.h, hsv.s, hsv.v);
+  setColorFromHex(rgbToHex(rgb.r, rgb.g, rgb.b), 'sv');
+}
+
+function initColorPicker(){
+  els.colorPanel.hidden = true;
+  setColorFromHex(state.color, null);
+
+  els.colorSwatch.addEventListener('click', (e)=>{
+    e.stopPropagation();
+    els.colorPanel.hidden = !els.colorPanel.hidden;
+    if(!els.colorPanel.hidden) drawSvSquare();
+  });
+
+  els.colorPanel.addEventListener('click', (e)=>{
+    e.stopPropagation();
+  });
+
+  document.addEventListener('click', ()=>{
+    if(!els.colorPanel.hidden){
+      els.colorPanel.hidden = true;
+    }
+  });
+
+  let svDragging = false;
+  function updateSvFromEvent(e){
+    const rect = els.svCanvas.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    const x = Math.max(0, Math.min(rect.width, clientX - rect.left));
+    const y = Math.max(0, Math.min(rect.height, clientY - rect.top));
+    hsv.s = (x/rect.width) * 100;
+    hsv.v = (1 - y/rect.height) * 100;
+    setColorFromHsv();
+  }
+  els.svCanvas.addEventListener('mousedown', (e)=>{ svDragging = true; updateSvFromEvent(e); });
+  els.svCanvas.addEventListener('touchstart', (e)=>{ svDragging = true; updateSvFromEvent(e); });
+  window.addEventListener('mousemove', (e)=>{ if(svDragging) updateSvFromEvent(e); });
+  window.addEventListener('touchmove', (e)=>{ if(svDragging){ e.preventDefault(); updateSvFromEvent(e); } }, {passive:false});
+  window.addEventListener('mouseup', ()=>{ svDragging = false; });
+  window.addEventListener('touchend', ()=>{ svDragging = false; });
+
+  els.hueInput.addEventListener('input', ()=>{
+    hsv.h = Number(els.hueInput.value);
+    setColorFromHsv();
+  });
+
+  els.hexInput.addEventListener('change', ()=>{
+    let v = els.hexInput.value.trim();
+    if(!v.startsWith('#')) v = '#' + v;
+    if(hexToRgb(v)) setColorFromHex(v, 'hex');
+    else els.hexInput.value = state.color;
+  });
+
+  const onRgbChange = ()=>{
+    const r = Number(els.rInput.value)||0, g=Number(els.gInput.value)||0, b=Number(els.bInput.value)||0;
+    setColorFromHex(rgbToHex(r,g,b), 'rgb');
+  };
+  [els.rInput, els.gInput, els.bInput].forEach(inp=> inp.addEventListener('input', onRgbChange));
+}
+initColorPicker();
+
+// drag text on canvas
+let dragging = false;
+function pointerPos(e){
+  const rect = canvas.getBoundingClientRect();
+  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+  const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+  return {
+    x: ((clientX - rect.left) / rect.width) * 100,
+    y: ((clientY - rect.top) / rect.height) * 100,
+  };
+}
+canvas.addEventListener('mousedown', (e)=>{ dragging = true; });
+canvas.addEventListener('touchstart', (e)=>{ dragging = true; });
+window.addEventListener('mousemove', (e)=>{
+  if(!dragging) return;
+  const p = pointerPos(e);
+  state.x = Math.max(0, Math.min(100, p.x));
+  state.y = Math.max(0, Math.min(100, p.y));
+  updateUIValues();
+  draw();
+});
+window.addEventListener('touchmove', (e)=>{
+  if(!dragging) return;
+  const p = pointerPos(e);
+  state.x = Math.max(0, Math.min(100, p.x));
+  state.y = Math.max(0, Math.min(100, p.y));
+  updateUIValues();
+  draw();
+});
+window.addEventListener('mouseup', ()=>{ dragging=false; });
+window.addEventListener('touchend', ()=>{ dragging=false; });
+
+// ---------- file loading ----------
+
+function handleFile(file){
+  if(!file) return;
+  const validTypes = ['image/png','image/jpeg'];
+  if(!validTypes.includes(file.type)){
+    showMsg(els.stageMsg, `지원하지 않는 파일 형식입니다 (${file.type || '알 수 없음'}). 기존 작업은 유지됩니다. PNG 또는 JPEG만 가능합니다.`, 'err');
+    els.fileInput.value = '';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = (ev)=>{
+    const dataUrl = ev.target.result;
+    const img = new Image();
+    img.onload = ()=>{
+      state.img = img;
+      state.imgDataURL = dataUrl;
+      draw();
+      showMsg(els.stageMsg, '이미지를 불러왔습니다.', 'ok');
+    };
+    img.onerror = ()=>{
+      showMsg(els.stageMsg, '이미지를 여는 데 실패했습니다. 기존 작업은 유지됩니다.', 'err');
+    };
+    img.src = dataUrl;
+  };
+  reader.onerror = ()=>{
+    showMsg(els.stageMsg, '파일을 읽는 데 실패했습니다.', 'err');
+  };
+  reader.readAsDataURL(file);
+}
+
+els.uploadBtn.addEventListener('click', ()=> els.fileInput.click());
+
+els.fileInput.addEventListener('change', ()=>{
+  handleFile(els.fileInput.files[0]);
+});
+
+['dragenter','dragover'].forEach(evt=>{
+  els.dropzone.addEventListener(evt, (e)=>{
+    e.preventDefault();
+    els.dropzone.classList.add('drag-over');
+  });
+});
+['dragleave','drop'].forEach(evt=>{
+  els.dropzone.addEventListener(evt, (e)=>{
+    e.preventDefault();
+    els.dropzone.classList.remove('drag-over');
+  });
+});
+els.dropzone.addEventListener('drop', (e)=>{
+  const file = e.dataTransfer.files && e.dataTransfer.files[0];
+  handleFile(file);
+});
+
+// ---------- download ----------
+
+els.downloadBtn.addEventListener('click', ()=>{
+  const link = document.createElement('a');
+  link.download = `card-${state.ratio.replace(':','x')}-${Date.now()}.png`;
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+});
+
+// ---------- templates (persistent storage) ----------
+
+function currentAsTemplate(name, id){
+  return {
+    id: id || ('tpl_' + Date.now() + '_' + Math.random().toString(36).slice(2,7)),
+    name,
+    ratio: state.ratio,
+    text: state.text,
+    fontSize: state.fontSize,
+    x: state.x,
+    y: state.y,
+    color: state.color,
+    imgDataURL: state.imgDataURL,
+    updatedAt: Date.now(),
+  };
+}
+
+function isValidTemplate(t){
+  if(!t || typeof t !== 'object') return false;
+  const requiredStrings = ['id','name','ratio','color'];
+  for(const k of requiredStrings){ if(typeof t[k] !== 'string' || t[k].length === 0) return false; }
+  if(!RATIOS[t.ratio]) return false;
+  if(typeof t.text !== 'string') return false;
+  if(typeof t.fontSize !== 'number') return false;
+  if(typeof t.x !== 'number' || typeof t.y !== 'number') return false;
+  return true;
+}
+
+async function listTemplates(){
+  try{
+    const res = await storage.list('template:', false);
+    if(!res || !res.keys) return [];
+    const items = [];
+    for(const key of res.keys){
+      try{
+        const r = await storage.get(key, false);
+        if(r && r.value){
+          const parsed = JSON.parse(r.value);
+          if(isValidTemplate(parsed)) items.push(parsed);
+        }
+      }catch(e){ /* skip unreadable key */ }
+    }
+    items.sort((a,b)=> (b.updatedAt||0) - (a.updatedAt||0));
+    return items;
+  }catch(e){
+    return [];
+  }
+}
+
+let editingTplId = null;
+
+function setCurrentTplLabel(name){
+  els.currentTplLabel.textContent = name ? `현재 선택된 템플릿: ${name}` : '';
+}
+
+async function renderTplList(){
+  const items = await listTemplates();
+  if(items.length === 0){
+    els.tplList.innerHTML = '<div class="tpl-empty">저장된 템플릿이 없습니다</div>';
+    return;
+  }
+  els.tplList.innerHTML = '';
+  for(const t of items){
+    const isEditing = t.id === editingTplId;
+    const row = document.createElement('div');
+    row.className = 'tpl-item';
+    row.innerHTML = `
+      <img class="tpl-thumb" src="${t.imgDataURL || ''}" onerror="this.style.visibility='hidden'">
+      <div class="tpl-name">${escapeHtml(t.name)}</div>
+      <button class="btn small" data-act="load">불러오기</button>
+      <button class="btn small" data-act="update">${isEditing ? '수정 저장' : '수정하기'}</button>
+      <button class="btn small" data-act="delete">삭제</button>
+    `;
+    row.querySelector('[data-act="load"]').addEventListener('click', ()=> loadTemplate(t));
+    row.querySelector('[data-act="update"]').addEventListener('click', ()=>{
+      if(editingTplId === t.id){
+        commitEdit(t.id, t.name);
+      } else {
+        enterEditMode(t);
+      }
+    });
+    row.querySelector('[data-act="delete"]').addEventListener('click', ()=> deleteTemplate(t.id));
+    els.tplList.appendChild(row);
+  }
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function applyTemplateToForm(t){
+  state.ratio = t.ratio;
+  state.text = t.text;
+  state.fontSize = t.fontSize;
+  state.x = t.x;
+  state.y = t.y;
+  state.color = t.color;
+  state.imgDataURL = t.imgDataURL || null;
+
+  els.textInput.value = state.text;
+  updateUIValues();
+  setColorFromHex(state.color, null);
+  [...els.ratioTabs.children].forEach(b=>{
+    b.classList.toggle('active', b.dataset.ratio === state.ratio);
+  });
+
+  if(state.imgDataURL){
+    const img = new Image();
+    img.onload = ()=>{ state.img = img; draw(); };
+    img.src = state.imgDataURL;
+  } else {
+    state.img = null;
+    draw();
+  }
+  els.tplNameInput.value = t.name;
+}
+
+function loadTemplate(t){
+  applyTemplateToForm(t);
+  editingTplId = null;
+  setCurrentTplLabel(t.name);
+  showMsg(els.tplActionMsg, `"${t.name}" 템플릿을 불러왔습니다.`, 'ok');
+  renderTplList();
+}
+
+function enterEditMode(t){
+  applyTemplateToForm(t);
+  editingTplId = t.id;
+  setCurrentTplLabel(t.name);
+  showMsg(els.tplActionMsg, `"${t.name}" 템플릿을 수정 중입니다. 값을 바꾼 뒤 "수정 저장"을 눌러주세요.`, 'ok');
+  renderTplList();
+}
+
+async function saveNewTemplate(){
+  const name = els.tplNameInput.value.trim();
+  if(!name){
+    showMsg(els.tplActionMsg, '템플릿 이름을 입력해주세요.', 'err');
+    return;
+  }
+  const tpl = currentAsTemplate(name);
+  await storage.set('template:' + tpl.id, JSON.stringify(tpl), false);
+  showMsg(els.tplActionMsg, `"${name}" 템플릿을 저장했습니다.`, 'ok');
+  els.tplNameInput.value = '';
+  renderTplList();
+}
+
+async function commitEdit(id, oldName){
+  const name = els.tplNameInput.value.trim() || oldName;
+  const tpl = currentAsTemplate(name, id);
+  await storage.set('template:' + id, JSON.stringify(tpl), false);
+  showMsg(els.tplActionMsg, `"${name}" 템플릿을 수정 저장했습니다.`, 'ok');
+  editingTplId = null;
+  setCurrentTplLabel(name);
+  renderTplList();
+}
+
+async function deleteTemplate(id){
+  await storage.delete('template:' + id, false);
+  if(editingTplId === id){
+    editingTplId = null;
+    setCurrentTplLabel('');
+  }
+  showMsg(els.tplActionMsg, '템플릿을 삭제했습니다.', 'ok');
+  renderTplList();
+}
+
+els.saveTplBtn.addEventListener('click', saveNewTemplate);
+
+// ---------- JSON export / import ----------
+
+els.exportJsonBtn.addEventListener('click', async ()=>{
+  const items = await listTemplates();
+  const blob = new Blob([JSON.stringify(items, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.download = `templates-${Date.now()}.json`;
+  link.href = url;
+  link.click();
+  URL.revokeObjectURL(url);
+  showMsg(els.tplMsg, `템플릿 ${items.length}개를 내보냈습니다.`, 'ok');
+});
+
+els.importJsonInput.addEventListener('change', async ()=>{
+  const file = els.importJsonInput.files[0];
+  if(!file) return;
+  const text = await file.text();
+  let parsed;
+  try{
+    parsed = JSON.parse(text);
+  }catch(e){
+    showMsg(els.tplMsg, 'JSON 문법이 손상되어 가져오기를 취소했습니다. 기존 템플릿은 유지됩니다.', 'err');
+    els.importJsonInput.value = false;
+    return;
+  }
+  if(!Array.isArray(parsed)){
+    showMsg(els.tplMsg, 'JSON 형식이 올바르지 않습니다(배열이 아님). 기존 템플릿은 유지됩니다.', 'err');
+    els.importJsonInput.value = '';
+    return;
+  }
+  const invalid = parsed.filter(t => !isValidTemplate(t));
+  if(invalid.length > 0){
+    showMsg(els.tplMsg, `필수 항목이 빠진 템플릿이 ${invalid.length}개 있어 가져오기를 취소했습니다. 기존 템플릿은 유지됩니다.`, 'err');
+    els.importJsonInput.value = '';
+    return;
+  }
+  for(const t of parsed){
+    await storage.set('template:' + t.id, JSON.stringify(t), false);
+  }
+  showMsg(els.tplMsg, `템플릿 ${parsed.length}개를 복원했습니다.`, 'ok');
+  els.importJsonInput.value = '';
+  renderTplList();
+});
+
+// ---------- init ----------
+draw();
+renderTplList();
+</script>
+</body>
+</html>
