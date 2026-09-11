@@ -753,10 +753,10 @@ function draw(){
 
     let cy = topY + lineHeight*0.8;
     ctx.textAlign = 'left';
+    const leftX = cx - blockWidth/2; // same left edge for every line
 
     for(const line of lines){
-      const lineWidth = measureLineWidth(ctx, line, spaceWidth);
-      let xCursor = cx - lineWidth/2;
+      let xCursor = leftX;
       line.forEach((word, i)=>{
         const segments = splitByColorRuns(word.start, word.end, colorRuns);
         segments.forEach(seg=>{
