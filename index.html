@@ -434,6 +434,7 @@
       </div>
       <div class="field">
         <label>색상</label>
+        <div class="dropzone-hint" style="margin:-2px 0 2px;">문구 일부를 드래그로 선택한 뒤 색을 고르면 그 부분만 바뀌어요</div>
         <div class="color-picker">
           <button type="button" class="color-swatch" id="colorSwatch"></button>
           <div class="color-panel" id="colorPanel" hidden>
@@ -458,7 +459,7 @@
       <div class="msg" id="tplActionMsg"></div>
       <div class="row">
         <input type="text" id="tplNameInput" placeholder="템플릿 이름">
-        <button class="btn small" id="saveTplBtn">현재 상태 저장</button>
+        <button class="btn small" id="saveTplBtn">현재 저장</button>
       </div>
       <div class="tpl-list" id="tplList"><div class="tpl-empty">저장된 템플릿이 없습니다</div></div>
     </div>
@@ -524,6 +525,7 @@ const state = {
   x: 50,
   y: 85,
   color: '#000000',
+  colorRanges: [], // [{start, end, color}] — 선택 영역별 색상 오버라이드
 };
 
 const canvas = document.getElementById('stageCanvas');
@@ -570,48 +572,108 @@ function showMsg(el, text, type){
 
 // ---------- drawing ----------
 
-function wrapLines(context, text, maxWidth){
-  const paragraphs = text.split('\n');
+// Wraps text into lines of word-tokens, each token keeping its original
+// character index range in state.text so color ranges can be looked up
+// per word (and per character, for long words that get char-broken).
+function buildWrappedLines(context, text, maxWidth){
+  const spaceWidth = context.measureText(' ').width;
   const lines = [];
-  for(const para of paragraphs){
-    if(para === ''){ lines.push(''); continue; }
-    const words = para.split(' ');
-    let current = '';
-    for(const word of words){
-      const attempt = current ? current + ' ' + word : word;
-      if(context.measureText(attempt).width <= maxWidth || current === ''){
-        if(context.measureText(attempt).width <= maxWidth){
-          current = attempt;
-        } else {
-          if(current) lines.push(current);
-          current = breakLongToken(context, word, maxWidth, lines);
+  let globalIdx = 0;
+  const paragraphs = text.split('\n');
+
+  paragraphs.forEach((para)=>{
+    if(para === ''){
+      lines.push([]);
+    } else {
+      const words = para.split(' ');
+      let currentLine = [];
+      let currentWidth = 0;
+      let localIdx = globalIdx;
+
+      words.forEach((word)=>{
+        const wordStart = localIdx;
+        const wordEnd = wordStart + word.length;
+
+        if(word !== ''){
+          const wWidth = context.measureText(word).width;
+          if(wWidth <= maxWidth){
+            const testWidth = currentWidth + (currentLine.length ? spaceWidth : 0) + wWidth;
+            if(testWidth <= maxWidth || currentLine.length === 0){
+              currentLine.push({text:word, start:wordStart, end:wordEnd});
+              currentWidth = testWidth;
+            } else {
+              lines.push(currentLine);
+              currentLine = [{text:word, start:wordStart, end:wordEnd}];
+              currentWidth = wWidth;
+            }
+          } else {
+            if(currentLine.length){ lines.push(currentLine); currentLine = []; currentWidth = 0; }
+            let chunkStart = wordStart;
+            let cur = '';
+            let charIdx = wordStart;
+            for(const ch of Array.from(word)){
+              const attempt = cur + ch;
+              if(context.measureText(attempt).width <= maxWidth || cur === ''){
+                cur = attempt;
+              } else {
+                lines.push([{text:cur, start:chunkStart, end:chunkStart+cur.length}]);
+                chunkStart = charIdx;
+                cur = ch;
+              }
+              charIdx += ch.length;
+            }
+            if(cur !== ''){
+              currentLine = [{text:cur, start:chunkStart, end:chunkStart+cur.length}];
+              currentWidth = context.measureText(cur).width;
+            }
+          }
         }
-      } else {
-        lines.push(current);
-        current = word;
-        if(context.measureText(current).width > maxWidth){
-          current = breakLongToken(context, current, maxWidth, lines);
-        }
-      }
+        localIdx = wordEnd + 1; // +1 for the space (or the boundary) consumed
+      });
+
+      if(currentLine.length) lines.push(currentLine);
     }
-    if(current !== '') lines.push(current);
-  }
+    globalIdx += para.length + 1; // +1 for the '\n' consumed between paragraphs
+  });
+
   return lines;
 }
 
-function breakLongToken(context, token, maxWidth, lines){
-  const chars = Array.from(token);
-  let cur = '';
-  for(const ch of chars){
-    const attempt = cur + ch;
-    if(context.measureText(attempt).width <= maxWidth || cur === ''){
-      cur = attempt;
-    } else {
-      lines.push(cur);
-      cur = ch;
-    }
+// Builds a flat list of {start, end, color} runs covering the whole text,
+// merging the base color with any explicit selection color overrides.
+function getColorRuns(textLength, ranges, baseColor){
+  const runs = [];
+  const sorted = [...ranges].sort((a,b)=> a.start - b.start);
+  let cursor = 0;
+  for(const r of sorted){
+    const s = Math.max(0, Math.min(textLength, r.start));
+    const e = Math.max(0, Math.min(textLength, r.end));
+    if(e <= s) continue;
+    if(s > cursor) runs.push({start:cursor, end:s, color:baseColor});
+    runs.push({start:s, end:e, color:r.color});
+    cursor = Math.max(cursor, e);
   }
-  return cur;
+  if(cursor < textLength) runs.push({start:cursor, end:textLength, color:baseColor});
+  return runs;
+}
+
+function splitByColorRuns(start, end, runs){
+  const segments = [];
+  for(const r of runs){
+    const s = Math.max(start, r.start);
+    const e = Math.min(end, r.end);
+    if(s < e) segments.push({start:s, end:e, color:r.color});
+  }
+  return segments;
+}
+
+function measureLineWidth(context, line, spaceWidth){
+  let w = 0;
+  line.forEach((word, i)=>{
+    w += context.measureText(word.text).width;
+    if(i < line.length - 1) w += spaceWidth;
+  });
+  return w;
 }
 
 function draw(){
@@ -649,21 +711,50 @@ function draw(){
   if(state.text){
     const fontPx = state.fontSize * (w/1080);
     ctx.font = `700 ${fontPx}px 'Space Grotesk', Pretendard, sans-serif`;
-    ctx.fillStyle = state.color;
-    ctx.textAlign = 'center';
 
+    const margin = 16 * (w/1080);
     const maxWidth = w * 0.88;
-    const lines = wrapLines(ctx, state.text, maxWidth);
+    const spaceWidth = ctx.measureText(' ').width;
+    const lines = buildWrappedLines(ctx, state.text, maxWidth);
     const lineHeight = fontPx * 1.2;
     const totalHeight = lines.length * lineHeight;
+    const colorRuns = getColorRuns(state.text.length, state.colorRanges, state.color);
 
-    const cx = w * (state.x/100);
-    let cy = h * (state.y/100) - totalHeight/2 + lineHeight*0.8;
+    // widest actual line (used to keep text horizontally inside the canvas
+    // even when it's shorter than maxWidth)
+    let blockWidth = 0;
+    for(const line of lines){
+      blockWidth = Math.max(blockWidth, measureLineWidth(ctx, line, spaceWidth));
+    }
+
+    // desired position from the sliders
+    let cx = w * (state.x/100);
+    let topY = h * (state.y/100) - totalHeight/2;
+
+    // clamp horizontally so the widest line never spills past the canvas edge
+    const halfBlock = Math.min(blockWidth/2, (w - margin*2)/2);
+    cx = Math.max(margin + halfBlock, Math.min(w - margin - halfBlock, cx));
+
+    // clamp vertically so the whole text block stays inside the canvas
+    const maxTop = Math.max(margin, h - margin - totalHeight);
+    topY = Math.max(margin, Math.min(maxTop, topY));
+
+    let cy = topY + lineHeight*0.8;
+    ctx.textAlign = 'left';
 
     for(const line of lines){
-      if(line !== ''){
-        ctx.fillText(line, cx, cy);
-      }
+      const lineWidth = measureLineWidth(ctx, line, spaceWidth);
+      let xCursor = cx - lineWidth/2;
+      line.forEach((word, i)=>{
+        const segments = splitByColorRuns(word.start, word.end, colorRuns);
+        segments.forEach(seg=>{
+          const segText = state.text.slice(seg.start, seg.end);
+          ctx.fillStyle = seg.color;
+          ctx.fillText(segText, xCursor, cy);
+          xCursor += ctx.measureText(segText).width;
+        });
+        if(i < line.length - 1) xCursor += spaceWidth;
+      });
       cy += lineHeight;
     }
   }
@@ -703,7 +794,14 @@ function updateUIValues(){
 
 [els.sizeInput, els.xInput, els.yInput].forEach(updateSliderFill);
 
-els.textInput.addEventListener('input', ()=>{ state.text = els.textInput.value; draw(); });
+els.textInput.addEventListener('input', ()=>{
+  state.text = els.textInput.value;
+  const len = state.text.length;
+  state.colorRanges = state.colorRanges
+    .map(r => ({ start: Math.min(r.start, len), end: Math.min(r.end, len), color: r.color }))
+    .filter(r => r.end > r.start);
+  draw();
+});
 
 els.sizeInput.addEventListener('input', ()=>{
   state.fontSize = Number(els.sizeInput.value);
@@ -799,12 +897,14 @@ function drawSvSquare(){
   svCtx.stroke();
 }
 
-function setColorFromHex(hex, source){
+// Updates the picker UI (swatch/hex/rgb/hue/sv square) to reflect a color,
+// without touching state.color or state.colorRanges or redrawing the canvas.
+function syncPickerFields(hex, source){
   const rgb = hexToRgb(hex);
-  if(!rgb) return;
-  state.color = rgbToHex(rgb.r, rgb.g, rgb.b);
-  els.colorSwatch.style.background = state.color;
-  if(source !== 'hex') els.hexInput.value = state.color;
+  if(!rgb) return null;
+  const normalized = rgbToHex(rgb.r, rgb.g, rgb.b);
+  els.colorSwatch.style.background = normalized;
+  if(source !== 'hex') els.hexInput.value = normalized;
   if(source !== 'rgb'){ els.rInput.value = rgb.r; els.gInput.value = rgb.g; els.bInput.value = rgb.b; }
   if(source !== 'sv' && source !== 'hue'){
     const newHsv = rgbToHsv(rgb.r, rgb.g, rgb.b);
@@ -812,18 +912,62 @@ function setColorFromHex(hex, source){
     els.hueInput.value = hsv.h;
   }
   drawSvSquare();
+  return normalized;
+}
+
+// Merges a new color into state.colorRanges for [start,end), replacing/
+// trimming any ranges it overlaps.
+function setRangeColor(start, end, color){
+  const merged = [];
+  for(const r of state.colorRanges){
+    if(r.end <= start || r.start >= end){
+      merged.push(r);
+    } else {
+      if(r.start < start) merged.push({start:r.start, end:start, color:r.color});
+      if(r.end > end) merged.push({start:end, end:r.end, color:r.color});
+    }
+  }
+  merged.push({start, end, color});
+  merged.sort((a,b)=> a.start - b.start);
+  state.colorRanges = merged;
+}
+
+// Applies a picked color: to the current text selection if one exists
+// (captured when the color swatch was opened), otherwise to the whole text.
+function applyPickedColor(hex, source){
+  const normalized = syncPickerFields(hex, source);
+  if(!normalized) return;
+  if(pendingSelection && pendingSelection.end > pendingSelection.start){
+    setRangeColor(pendingSelection.start, pendingSelection.end, normalized);
+  } else {
+    state.color = normalized;
+    state.colorRanges = [];
+  }
   draw();
 }
 
-function setColorFromHsv(){
-  const rgb = hsvToRgb(hsv.h, hsv.s, hsv.v);
-  setColorFromHex(rgbToHex(rgb.r, rgb.g, rgb.b), 'sv');
+// Sets the base color without touching selection ranges — used on init and
+// when loading a template, where colorRanges are restored separately.
+function setBaseColorSilently(hex){
+  const normalized = syncPickerFields(hex, null);
+  if(normalized) state.color = normalized;
+  draw();
 }
+
+function applyHsvColor(source){
+  const rgb = hsvToRgb(hsv.h, hsv.s, hsv.v);
+  applyPickedColor(rgbToHex(rgb.r, rgb.g, rgb.b), source);
+}
+
+let pendingSelection = null;
 
 function initColorPicker(){
   els.colorPanel.hidden = true;
-  setColorFromHex(state.color, null);
+  setBaseColorSilently(state.color);
 
+  els.colorSwatch.addEventListener('mousedown', ()=>{
+    pendingSelection = { start: els.textInput.selectionStart, end: els.textInput.selectionEnd };
+  });
   els.colorSwatch.addEventListener('click', (e)=>{
     e.stopPropagation();
     els.colorPanel.hidden = !els.colorPanel.hidden;
@@ -849,7 +993,7 @@ function initColorPicker(){
     const y = Math.max(0, Math.min(rect.height, clientY - rect.top));
     hsv.s = (x/rect.width) * 100;
     hsv.v = (1 - y/rect.height) * 100;
-    setColorFromHsv();
+    applyHsvColor('sv');
   }
   els.svCanvas.addEventListener('mousedown', (e)=>{ svDragging = true; updateSvFromEvent(e); });
   els.svCanvas.addEventListener('touchstart', (e)=>{ svDragging = true; updateSvFromEvent(e); });
@@ -860,19 +1004,19 @@ function initColorPicker(){
 
   els.hueInput.addEventListener('input', ()=>{
     hsv.h = Number(els.hueInput.value);
-    setColorFromHsv();
+    applyHsvColor('hue');
   });
 
   els.hexInput.addEventListener('change', ()=>{
     let v = els.hexInput.value.trim();
     if(!v.startsWith('#')) v = '#' + v;
-    if(hexToRgb(v)) setColorFromHex(v, 'hex');
+    if(hexToRgb(v)) applyPickedColor(v, 'hex');
     else els.hexInput.value = state.color;
   });
 
   const onRgbChange = ()=>{
     const r = Number(els.rInput.value)||0, g=Number(els.gInput.value)||0, b=Number(els.bInput.value)||0;
-    setColorFromHex(rgbToHex(r,g,b), 'rgb');
+    applyPickedColor(rgbToHex(r,g,b), 'rgb');
   };
   [els.rInput, els.gInput, els.bInput].forEach(inp=> inp.addEventListener('input', onRgbChange));
 }
@@ -985,6 +1129,7 @@ function currentAsTemplate(name, id){
     x: state.x,
     y: state.y,
     color: state.color,
+    colorRanges: state.colorRanges,
     imgDataURL: state.imgDataURL,
     updatedAt: Date.now(),
   };
@@ -1070,11 +1215,12 @@ function applyTemplateToForm(t){
   state.x = t.x;
   state.y = t.y;
   state.color = t.color;
+  state.colorRanges = Array.isArray(t.colorRanges) ? t.colorRanges : [];
   state.imgDataURL = t.imgDataURL || null;
 
   els.textInput.value = state.text;
   updateUIValues();
-  setColorFromHex(state.color, null);
+  setBaseColorSilently(state.color);
   [...els.ratioTabs.children].forEach(b=>{
     b.classList.toggle('active', b.dataset.ratio === state.ratio);
   });
