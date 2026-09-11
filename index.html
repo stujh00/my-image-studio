@@ -585,25 +585,36 @@ function buildWrappedLines(context, text, maxWidth){
     if(para === ''){
       lines.push([]);
     } else {
-      const words = para.split(' ');
+      const tokens = para.split(' '); // '' entries mark extra consecutive spaces
       let currentLine = [];
       let currentWidth = 0;
       let localIdx = globalIdx;
+      let pendingSpaces = 0; // spaces seen since the last real word
 
-      words.forEach((word)=>{
+      tokens.forEach((token)=>{
+        if(token === ''){
+          pendingSpaces += 1;
+          localIdx += 1;
+          return;
+        }
+
         const wordStart = localIdx;
-        const wordEnd = wordStart + word.length;
+        const wordEnd = wordStart + token.length;
+        // gapBefore = actual number of space characters immediately
+        // preceding this word (only meaningful if it lands mid-line)
+        const gapBefore = currentLine.length ? pendingSpaces + 1 : 0;
+        const gapWidth = gapBefore * spaceWidth;
 
-        if(word !== ''){
-          const wWidth = context.measureText(word).width;
+        if(token !== ''){
+          const wWidth = context.measureText(token).width;
           if(wWidth <= maxWidth){
-            const testWidth = currentWidth + (currentLine.length ? spaceWidth : 0) + wWidth;
+            const testWidth = currentWidth + gapWidth + wWidth;
             if(testWidth <= maxWidth || currentLine.length === 0){
-              currentLine.push({text:word, start:wordStart, end:wordEnd});
+              currentLine.push({text:token, start:wordStart, end:wordEnd, gapBefore});
               currentWidth = testWidth;
             } else {
               lines.push(currentLine);
-              currentLine = [{text:word, start:wordStart, end:wordEnd}];
+              currentLine = [{text:token, start:wordStart, end:wordEnd, gapBefore:0}];
               currentWidth = wWidth;
             }
           } else {
@@ -611,24 +622,25 @@ function buildWrappedLines(context, text, maxWidth){
             let chunkStart = wordStart;
             let cur = '';
             let charIdx = wordStart;
-            for(const ch of Array.from(word)){
+            for(const ch of Array.from(token)){
               const attempt = cur + ch;
               if(context.measureText(attempt).width <= maxWidth || cur === ''){
                 cur = attempt;
               } else {
-                lines.push([{text:cur, start:chunkStart, end:chunkStart+cur.length}]);
+                lines.push([{text:cur, start:chunkStart, end:chunkStart+cur.length, gapBefore:0}]);
                 chunkStart = charIdx;
                 cur = ch;
               }
               charIdx += ch.length;
             }
             if(cur !== ''){
-              currentLine = [{text:cur, start:chunkStart, end:chunkStart+cur.length}];
+              currentLine = [{text:cur, start:chunkStart, end:chunkStart+cur.length, gapBefore:0}];
               currentWidth = context.measureText(cur).width;
             }
           }
         }
-        localIdx = wordEnd + 1; // +1 for the space (or the boundary) consumed
+        pendingSpaces = 0;
+        localIdx = wordEnd + 1; // +1 for the delimiter space consumed by split(' ')
       });
 
       if(currentLine.length) lines.push(currentLine);
@@ -671,7 +683,7 @@ function measureLineWidth(context, line, spaceWidth){
   let w = 0;
   line.forEach((word, i)=>{
     w += context.measureText(word.text).width;
-    if(i < line.length - 1) w += spaceWidth;
+    if(i < line.length - 1) w += (line[i+1].gapBefore || 1) * spaceWidth;
   });
   return w;
 }
@@ -753,7 +765,7 @@ function draw(){
           ctx.fillText(segText, xCursor, cy);
           xCursor += ctx.measureText(segText).width;
         });
-        if(i < line.length - 1) xCursor += spaceWidth;
+        if(i < line.length - 1) xCursor += (line[i+1].gapBefore || 1) * spaceWidth;
       });
       cy += lineHeight;
     }
